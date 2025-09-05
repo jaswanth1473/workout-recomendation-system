@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Workout Recommendation System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+  <style>
+    :root{
+      --bg-a:#071017; --bg-b:#0b2633; --card:#071826;
+      --accent:#00d1ff; --accent2:#5ff0a8; --muted:#9fb6c6; --text:#e8f6fb;
+      --danger:#ff6b6b; --ok:#6ef3a5; --stroke:rgba(255,255,255,.06)
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background: linear-gradient(180deg,var(--bg-a),var(--bg-b));
+      color:var(--text); -webkit-font-smoothing:antialiased; min-height:100vh;
+    }
+    header{
+      position:sticky; top:0; z-index:20; padding:12px 16px; backdrop-filter:blur(6px);
+      background: linear-gradient(90deg, rgba(7,24,33,0.6), rgba(11,38,51,0.6));
+      border-bottom:1px solid var(--stroke); display:flex; align-items:center; gap:12px; justify-content:space-between;
+    }
+    header h1{margin:0; font-size:1rem; font-weight:700; color:var(--accent)}
+    header small{color:var(--muted)}
+
+    .wrap{max-width:1050px; margin:18px auto; padding:12px;}
+    .panel{background:linear-gradient(180deg,var(--card),#071826); border:1px solid var(--stroke); border-radius:12px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,.45)}
+    .row{display:flex; gap:12px; align-items:center}
+    .cols{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+    .cols-3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+    label{display:block; font-weight:600; margin:8px 0 6px; color:var(--muted); font-size:.9rem}
+    input, select{width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--stroke); background:#071726; color:var(--text); font-size:.95rem}
+    button{padding:10px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:700}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#032226; box-shadow:0 8px 20px rgba(0,0,0,.5)}
+    .btn-ghost{background:transparent; color:var(--text); border:1px solid var(--stroke)}
+    .cards{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+    .card{padding:16px; border-radius:10px; cursor:pointer; border:1px solid var(--stroke); background:#071726; transition:transform .18s, box-shadow .18s}
+    .card:hover{transform:translateY(-6px); box-shadow:0 10px 30px rgba(0,0,0,.5)}
+    .card h3{margin:0 0 6px; color:var(--accent)}
+    .muted{color:var(--muted); font-size:.92rem}
+    .small{font-size:.85rem; color:var(--muted)}
+
+    .plan-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:10px}
+    .plan-card, .diet-card{background:#081722; border:1px solid var(--stroke); border-radius:10px; padding:12px; font-size:.92rem}
+    .summary{padding:10px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px dashed rgba(255,255,255,.02); text-align:center}
+
+    .kpi-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    .kpi{flex:1; min-width:140px; padding:10px; border-radius:10px; background:#071726; border:1px solid var(--stroke); text-align:center}
+    .kpi b{display:block; font-size:1.05rem; color:var(--accent2)}
+    .warn{color:var(--danger); font-weight:700}
+
+    .actions{display:flex; gap:10px; justify-content:center; margin-top:14px}
+    .note{font-size:.84rem; color:var(--muted); margin-top:10px}
+
+    @media (max-width:900px){
+      .cards{grid-template-columns:1fr}
+      .cols{grid-template-columns:1fr}
+      .plan-grid{grid-template-columns:1fr}
+      .kpi-row{flex-direction:column}
+      header{padding:10px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🏋️ Workout Recommendation System</h1>
+      <small>Personalized workouts, diet & macros — now with activity-level TDEE</small>
+    </div>
+    <div class="small">Strive for progress not perfection</div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- PAGE 0: Mode selection -->
+    <section id="page0" class="panel">
+      <h2 style="margin:0 0 8px;color:var(--accent2)">1) Choose where you'll train</h2>
+      <p class="muted" style="margin:0 0 12px">Pick Home (bodyweight) or Gym (equipment). Health flags later make plans conservative if needed.</p>
+      <div class="cards">
+        <div class="card" onclick="selectMode('home')">
+          <h3>Home Workout</h3>
+          <div class="small">Bodyweight circuits, yoga, low-equipment options</div>
+        </div>
+        <div class="card" onclick="selectMode('gym')">
+          <h3>Gym Workout</h3>
+          <div class="small">Free weights, machines, cardio machines</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 1: Details & health -->
+    <section id="page1" class="panel" style="display:none">
+      <h2 style="margin:0 0 6px;color:var(--accent2)">2) Your details & health</h2>
+      <form id="detailsForm">
+        <input type="hidden" id="mode" name="mode" value="">
+        <div class="cols">
+          <div>
+            <label>Age</label>
+            <input name="age" type="number" min="10" max="100" required placeholder="e.g., 28">
+          </div>
+          <div>
+            <label>Gender</label>
+            <select name="gender"><option value="male">Male</option><option value="female">Female</option></select>
+          </div>
+          <div>
+            <label>Height (cm)</label>
+            <input name="height" type="number" min="120" max="230" required placeholder="e.g., 170">
+          </div>
+          <div>
+            <label>Weight (kg)</label>
+            <input name="weight" type="number" min="30" max="250" required placeholder="e.g., 72">
+          </div>
+        </div>
+
+        <div class="cols" style="margin-top:6px">
+          <div>
+            <label>Goal</label>
+            <select name="goal"><option value="loss">Weight Loss</option><option value="gain">Weight Gain</option></select>
+          </div>
+          <div>
+            <label>Diet Preference</label>
+            <select name="diet"><option value="veg">Vegetarian</option><option value="nonveg">Non-Vegetarian</option></select>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <label>Activity level (daily non-exercise + work)</label>
+          <select name="activity">
+            <option value="sedentary">Sedentary (little/no exercise)</option>
+            <option value="light">Lightly active (1–3 days/wk)</option>
+            <option value="moderate">Moderately active (3–5 days/wk)</option>
+            <option value="very">Very active (6–7 days/wk)</option>
+          </select>
+        </div>
+
+        <div style="margin-top:10px">
+          <label>Health conditions (select Yes/No)</label>
+          <div class="row" style="margin-top:6px">
+            <div style="flex:1">
+              <label class="small">BP (Hypertension)</label>
+              <select name="bp"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+            <div style="flex:1">
+              <label class="small">Asthma</label>
+              <select name="asthma"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+            <div style="flex:1">
+              <label class="small">Heart Issues</label>
+              <select name="heart"><option value="no">No</option><option value="yes">Yes</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top:14px">
+          <button type="button" class="btn btn-ghost" onclick="goTo(0)">← Back</button>
+          <button type="submit" class="btn btn-primary">Generate Plan →</button>
+        </div>
+        <div class="note">We use Mifflin–St Jeor for BMR and activity multipliers to compute TDEE. This is educational — consult a doctor for medical clearance.</div>
+      </form>
+    </section>
+
+    <!-- PAGE 2: Results -->
+    <section id="page2" class="panel" style="display:none">
+      <div id="result"></div>
+      <div class="actions">
+        <button class="btn btn-ghost" onclick="goTo(1)">← Edit</button>
+        <button class="btn btn-primary" onclick="downloadPDF()">⬇️ Download PDF</button>
+      </div>
+    </section>
+  </main>
+
+<script>
+  // Navigation helpers
+  function goTo(n){
+    document.getElementById('page0').style.display = n===0 ? 'block' : 'none';
+    document.getElementById('page1').style.display = n===1 ? 'block' : 'none';
+    document.getElementById('page2').style.display = n===2 ? 'block' : 'none';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function selectMode(mode){
+    document.getElementById('mode').value = mode;
+    goTo(1);
+  }
+
+  // Calculations
+  function calcBMI(kg, cm){ return +(kg / ((cm/100)**2)).toFixed(1); }
+  function bmiCategory(bmi){
+    if (bmi<18.5) return 'Underweight';
+    if (bmi<25) return 'Normal';
+    if (bmi<30) return 'Overweight';
+    return 'Obese';
+  }
+  function calcBMR(kg, cm, age, gender){
+    // Mifflin-St Jeor
+    const bmr = (gender==='male')
+      ? 10*kg + 6.25*cm - 5*age + 5
+      : 10*kg + 6.25*cm - 5*age - 161;
+    return Math.round(bmr);
+  }
+  function activityMultiplier(level){
+    if(level==='sedentary') return 1.2;
+    if(level==='light') return 1.375;
+    if(level==='moderate') return 1.55;
+    return 1.725; // very
+  }
+  function targetCalories(bmr, activityLevel, goal, flags){
+    // TDEE from activity multiplier (more accurate than mode)
+    const tdee = Math.round(bmr * activityMultiplier(activityLevel));
+    // Adjust conservatively for health flags
+    let adjust = goal==='loss' ? -500 : +400;
+    if(flags.heart==='yes' || flags.bp==='yes') adjust = goal==='loss' ? -300 : +300;
+    // final
+    return Math.max(1100, Math.round(tdee + adjust));
+  }
+
+  // Workouts (7 days)
+  const HOME_BASE = [
+    {day:'Mon', w:'Full-body circuit — push-ups, squats, plank (30–35 min)', burn:260},
+    {day:'Tue', w:'Yoga & mobility (30–40 min)', burn:200},
+    {day:'Wed', w:'Bodyweight HIIT intervals (20–25 min)', burn:300},
+    {day:'Thu', w:'Core & glutes (bridges, bird-dog) (30 min)', burn:230},
+    {day:'Fri', w:'Cardio mix (marching, steps) (25–30 min)', burn:280},
+    {day:'Sat', w:'Bodyweight circuit (AMRAP style) (25–30 min)', burn:270},
+    {day:'Sun', w:'Active recovery walk + stretch (30–40 min)', burn:150},
+  ];
+  const HOME_CONSERVE = [
+    {day:'Mon', w:'Low-impact circuit (chair-assisted squats, wall push-ups) (20–25 min)', burn:170},
+    {day:'Tue', w:'Gentle yoga & breathing (25–30 min)', burn:150},
+    {day:'Wed', w:'Brisk walk in place / marching (25–30 min)', burn:180},
+    {day:'Thu', w:'Core stability (dead-bug, bird-dog) (20–25 min)', burn:160},
+    {day:'Fri', w:'Light cardio (step-ups) (20–25 min)', burn:180},
+    {day:'Sat', w:'Mobility & stretch (25–30 min)', burn:150},
+    {day:'Sun', w:'Rest or easy walk (20–30 min)', burn:120},
+  ];
+
+  const GYM_BASE = [
+    {day:'Mon', w:'Chest + Triceps (bench, incline DB, dips) + 10 min cardio', burn:420},
+    {day:'Tue', w:'Back + Biceps (rows, pulldown) + 10 min bike', burn:400},
+    {day:'Wed', w:'Legs (squats, deadlifts, lunges) + 10 min bike', burn:480},
+    {day:'Thu', w:'Shoulders + Core (OHP, lateral raise) + 10 min bike', burn:380},
+    {day:'Fri', w:'HIIT intervals on treadmill/bike 25–30 min', burn:450},
+    {day:'Sat', w:'Full-body circuit (machines + free weights) 30–40 min', burn:420},
+    {day:'Sun', w:'Active recovery walk / light cardio 30–40 min', burn:200},
+  ];
+  const GYM_CONSERVE = [
+    {day:'Mon', w:'Machine chest press + light triceps + 10 min easy bike', burn:300},
+    {day:'Tue', w:'Seated row + light biceps + 10 min easy bike', burn:290},
+    {day:'Wed', w:'Leg press + bodyweight box squat + 10 min easy bike', burn:320},
+    {day:'Thu', w:'Cable shoulders + light core work + 10 min easy bike', burn:280},
+    {day:'Fri', w:'Steady-state bike/elliptical 25–30 min', burn:300},
+    {day:'Sat', w:'Machines circuit (light-moderate) 30 min', burn:300},
+    {day:'Sun', w:'Gentle walk/stretch 20–30 min', burn:160},
+  ];
+
+  // Diet building & macros - per-meal split
+  function mealSplit(target){
+    // breakfast 25%, lunch 35%, snack 15%, dinner 25%
+    return {
+      breakfast: Math.round(target * 0.25),
+      lunch: Math.round(target * 0.35),
+      snack: Math.round(target * 0.15),
+      dinner: Math.round(target * 0.25)
+    };
+  }
+
+  function buildDiet(target, dietPref, goal){
+    const m = mealSplit(target);
+    if(dietPref==='veg'){
+      return {
+        breakfast: `Oats 60g + milk 200ml + banana ≈ ${m.breakfast} kcal`,
+        lunch: `Paneer/tofu 120g + cooked rice 180g + salad ≈ ${m.lunch} kcal`,
+        snack: `Greek yogurt 150g + mixed nuts 20g ≈ ${m.snack} kcal`,
+        dinner: `Dal 250g + 2 chapati + veg stir-fry ≈ ${m.dinner} kcal`
+      };
+    } else {
+      return {
+        breakfast: `3 eggs + 2 toast + milk 200ml ≈ ${m.breakfast} kcal`,
+        lunch: `Chicken breast 150g + cooked rice 200g + salad ≈ ${m.lunch} kcal`,
+        snack: `Protein shake (1 scoop) + almonds 20g ≈ ${m.snack} kcal`,
+        dinner: `Grilled fish 150g + quinoa 150g + veg ≈ ${m.dinner} kcal`
+      };
+    }
+  }
+
+  function macroSplit(target, goal){
+    // For loss: higher protein; for gain: more carbs
+    let pPerc=30, cPerc=40, fPerc=30;
+    if(goal==='loss'){ pPerc=35; cPerc=35; fPerc=30; }
+    if(goal==='gain'){ pPerc=25; cPerc=50; fPerc=25; }
+    const pCal = Math.round(target * (pPerc/100));
+    const cCal = Math.round(target * (cPerc/100));
+    const fCal = Math.round(target * (fPerc/100));
+    const pG = Math.round(pCal / 4);
+    const cG = Math.round(cCal / 4);
+    const fG = Math.round(fCal / 9);
+    return {pPerc,cPerc,fPerc, pCal,cCal,fCal, pG,cG,fG};
+  }
+
+  // Protein guidance (g/kg)
+  function proteinGuidance(goal, weight){
+    if(goal==='loss') return {min:1.6*weight, max:2.4*weight, note:'Higher protein helps preserve muscle during a calorie deficit.'};
+    return {min:1.4*weight, max:2.0*weight, note:'Aim moderate-high protein to support muscle gain.'};
+  }
+
+  // helper: safe parse int from "xxx kcal" strings if needed (not used now)
+  function intFromString(s){ const m=s.match(/\d+/); return m? +m[0] : 0; }
+
+  // ---------- Form submit ----------
+  document.getElementById('detailsForm').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+      mode: fd.get('mode') || 'home',
+      age: +fd.get('age'),
+      gender: fd.get('gender'),
+      height: +fd.get('height'),
+      weight: +fd.get('weight'),
+      goal: fd.get('goal'),
+      diet: fd.get('diet'),
+      activity: fd.get('activity'),
+      bp: fd.get('bp'),
+      asthma: fd.get('asthma'),
+      heart: fd.get('heart')
+    };
+
+    // calculations
+    const bmi = calcBMI(data.weight, data.height);
+    const bmiCat = bmiCategory(bmi);
+    const bmr = calcBMR(data.weight, data.height, data.age, data.gender);
+    const tdee = Math.round(bmr * activityMultiplier(data.activity));
+    const target = targetCalories(bmr, data.activity, data.goal, {bp:data.bp, asthma:data.asthma, heart:data.heart});
+    const dietPlan = buildDiet(target, data.diet, data.goal);
+    const macros = macroSplit(target, data.goal);
+    const proteinGuide = proteinGuidance(data.goal, data.weight);
+
+    // build workout
+    const sensitive = (data.bp==='yes' || data.asthma==='yes' || data.heart==='yes');
+    let plan = [];
+    if(data.mode==='home') plan = sensitive ? HOME_CONSERVE : HOME_BASE;
+    else plan = sensitive ? GYM_CONSERVE : GYM_BASE;
+
+    // tune plan: adjust burn by BMI & flags & goal
+    const tuned = plan.map(it=>{
+      let burn = it.burn;
+      if(data.goal==='loss'){ burn += (bmi>=27 ? 40 : 18); } else { burn -= 18; }
+      if(data.asthma==='yes') burn -= 30;
+      if(data.heart==='yes') burn = Math.min(burn, data.mode==='gym'?320:200);
+      if(data.bp==='yes') burn -= 20;
+      burn = Math.max(100, Math.round(burn));
+      return {day:it.day, w:it.w, burn};
+    });
+
+    const weeklyBurn = tuned.reduce((s,x)=>s+x.burn, 0);
+    const avgDailyBurn = Math.round(weeklyBurn / 7);
+
+    // Net
+    const netDaily = target - avgDailyBurn;
+
+    // Notes
+    const notes = [];
+    if(data.bp==='yes') notes.push('BP: avoid heavy isometrics; monitor RPE & keep moderate loads.');
+    if(data.asthma==='yes') notes.push('Asthma: longer warm-ups, avoid severe spikes; carry inhaler if prescribed.');
+    if(data.heart==='yes') notes.push('Heart issues: low-intensity only, seek medical clearance.');
+
+    // Build HTML
+    const html = `
+      <div id="printArea" style="padding:6px 0">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px">
+          <div>
+            <h2 style="margin:0;color:var(--accent2)">Personalized Plan</h2>
+            <div class="small muted">${data.mode==='gym'?'Gym':'Home'} • ${data.goal==='loss'?'Weight Loss':'Weight Gain'} • ${data.diet.toUpperCase()}</div>
+          </div>
+          <div class="pill" style="padding:6px 10px;border-radius:999px;background:#071726;border:1px solid var(--stroke);color:var(--muted)">${new Date().toLocaleDateString()}</div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="small muted">BMI</div>
+            <b>${bmi}</b>
+            <div class="small muted">${bmiCat}</div>
+          </div>
+          <div class="kpi">
+            <div class="small muted">BMR (kcal/day)</div><b>${bmr}</b>
+            <div class="small muted">TDEE ≈ ${tdee} (activity: ${data.activity})</div>
+          </div>
+          <div class="kpi">
+            <div class="small muted">Target Calories</div><b>${target} kcal/day</b>
+            <div class="small muted">Net per day (intake-burn): ${netDaily} kcal</div>
+          </div>
+        </div>
+
+        ${notes.length ? `<div class="summary" style="margin-top:12px"><b>Health guidance:</b> ${notes.join(' ')}${data.heart==='yes'? ' <span style="color:var(--danger);font-weight:700">Seek medical clearance.</span>':''}</div>` : ''}
+
+        <h3 style="margin-top:14px;color:var(--accent2)">Weekly workout (Mon → Sun)</h3>
+        <div class="plan-grid">
+          ${tuned.map(d=>`<div class="plan-card"><b>${d.day}</b><div class="small muted" style="margin-top:6px">${d.w}</div><div style="margin-top:8px"><b>Est. burn:</b> ${d.burn} kcal</div></div>`).join('')}
+        </div>
+
+        <div class="summary" style="margin-top:12px"><b>Weekly burn:</b> ${weeklyBurn} kcal • <b>Avg/day burn:</b> ${avgDailyBurn} kcal</div>
+
+        <h3 style="margin-top:14px;color:var(--accent2)">Daily Diet & Meal split</h3>
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px">
+          <div class="diet-card"><b>Breakfast</b><div class="small muted" style="margin-top:6px">${dietPlan.breakfast}</div></div>
+          <div class="diet-card"><b>Lunch</b><div class="small muted" style="margin-top:6px">${dietPlan.lunch}</div></div>
+          <div class="diet-card"><b>Snack</b><div class="small muted" style="margin-top:6px">${dietPlan.snack}</div></div>
+          <div class="diet-card"><b>Dinner</b><div class="small muted" style="margin-top:6px">${dietPlan.dinner}</div></div>
+        </div>
+
+        <h3 style="margin-top:14px;color:var(--accent2)">Macro breakdown</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="plan-card" style="flex:1;min-width:180px"><b>Protein</b><div class="small muted">${macros.pPerc}% • ${macros.pCal} kcal</div><div style="margin-top:8px"><b>${macros.pG} g protein/day</b></div></div>
+          <div class="plan-card" style="flex:1;min-width:180px"><b>Carbs</b><div class="small muted">${macros.cPerc}% • ${macros.cCal} kcal</div><div style="margin-top:8px"><b>${macros.cG} g carbs/day</b></div></div>
+          <div class="plan-card" style="flex:1;min-width:180px"><b>Fats</b><div class="small muted">${macros.fPerc}% • ${macros.fCal} kcal</div><div style="margin-top:8px"><b>${macros.fG} g fat/day</b></div></div>
+        </div>
+
+        <div class="summary" style="margin-top:12px">
+          <b>Protein guideline:</b> ${Math.round(proteinGuide.min)}–${Math.round(proteinGuide.max)} g/day (≈ ${Math.round(proteinGuide.min/data.weight)}–${Math.round(proteinGuide.max/data.weight)} g/kg).<br>
+          ${proteinGuide.note}
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; align-items:center">
+          <div class="small muted">Generated for: Age ${data.age} • ${data.gender} • H ${data.height}cm • W ${data.weight}kg</div>
+          <div class="small muted">Note: consult physician if medical conditions exist.</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('result').innerHTML = html;
+    goTo(2);
+  });
+
+  function downloadPDF(){
+    const el = document.getElementById('printArea');
+    if(!el) return alert('Please generate the plan first.');
+    const opt = {
+      margin: 8,
+      filename: 'Workout_Diet_Plan.pdf',
+      image: {type:'jpeg', quality:0.98},
+      html2canvas: {scale:2, useCORS:true, background:'#ffffff'},
+      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+    };
+    html2pdf().from(el).set(opt).save();
+  }
+</script>
+</body>
+</html>
